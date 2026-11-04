@@ -10,7 +10,7 @@ namespace KMSEmulator.RPC
         private IMessageHandler RequestMessageHandler { get; set; }
         private IKMSServerSettings Settings { get; set; }
 
-        public RpcMessageHandler(IKMSServerSettings settings,  IMessageHandler requestMessageHandler)
+        public RpcMessageHandler(IKMSServerSettings settings, IMessageHandler requestMessageHandler)
         {
             RequestMessageHandler = requestMessageHandler;
             Settings = settings;
@@ -18,9 +18,19 @@ namespace KMSEmulator.RPC
 
         public byte[] HandleRequest(byte[] request)
         {
+            if (request == null || request.Length < 3)
+            {
+                return new byte[0];
+            }
+
             byte messageType = request[2];
 
             IMessageHandler requestHandler = GetMessageHandler(messageType);
+            if (requestHandler == null)
+            {
+                // Safely ignore unhandled/malformed/scanning packet types
+                return new byte[0];
+            }
 
             byte[] response = requestHandler.HandleRequest(request);
             return response;
@@ -38,7 +48,9 @@ namespace KMSEmulator.RPC
                     requestHandler = new RpcRequestMessageHandler(RequestMessageHandler);
                     break;
                 default:
-                    throw new ApplicationException("Unhandled message type: " + messageType);
+                    // Return null instead of throwing an exception
+                    requestHandler = null;
+                    break;
             }
             return requestHandler;
         }
