@@ -16,9 +16,9 @@ namespace KMSEmulator
             DefaultKMSHWID = "364F463A8863D35F";
             GenerateRandomKMSPID = true;
             Port = 1688;
-            VLActivationInterval = 120;
-            VLRenewalInterval = 43200;
-            KillProcessOnPort = false;
+            VLActivationInterval = 120;  //2hrs retry
+            VLRenewalInterval = 259200;  //180 days in mins
+            KillProcessOnPort = true;
         }
 
         /// <summary>
@@ -82,6 +82,7 @@ namespace KMSEmulator
                 }
                 _mDefaultKMSHWID = value;
             }
+
         }
      
         /// <summary>
@@ -130,10 +131,10 @@ namespace KMSEmulator
                 {
                     throw new ArgumentOutOfRangeException("value", "KMS Activation Interval cannot be less than 15 minutes.");
                 }
-                if (value > 43200)
-                {
-                    throw new ArgumentOutOfRangeException("value", "KMS Activation Interval cannot be greater than 43200 minutes.");
-                }
+             //   if (value > 43200)
+             //   {
+             //       throw new ArgumentOutOfRangeException("value", "KMS Activation Interval cannot be greater than 43200 minutes.");
+             //   }   //Remove upper check
                 _mVLActivationInterval = value;
             }
         }
@@ -154,10 +155,10 @@ namespace KMSEmulator
                 {
                     throw new ArgumentOutOfRangeException("value", "KMS Renewal Interval cannot be less than 15 minutes.");
                 }
-                if (value > 43200)
-                {
-                    throw new ArgumentOutOfRangeException("value", "KMS Renewal Interval cannot be greater than 43200 minutes.");
-                }
+               // if (value > 43200)
+               // {
+               //     throw new ArgumentOutOfRangeException("value", "KMS Renewal Interval cannot be greater than 43200 minutes.");
+               // }
                 _mVLRenewalInterval = value;
             }
         }

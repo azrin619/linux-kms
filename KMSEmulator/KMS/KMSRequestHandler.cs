@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using KMSEmulator.KMS.V4;
 using KMSEmulator.KMS.V5;
 using KMSEmulator.KMS.V6;
@@ -10,6 +10,7 @@ namespace KMSEmulator.KMS
     {
         private readonly IKMSServerSettings _serverSettings;
         private readonly ILogger _logger;
+
         public KMSRequestHandler(IKMSServerSettings settings, ILogger logger)
         {
             _serverSettings = settings;
@@ -19,6 +20,13 @@ namespace KMSEmulator.KMS
         public byte[] HandleRequest(byte[] request)
         {
             const int unknownDataSize = 8;
+
+            // Bounds check: verify request is non-null and long enough for version bytes (unknownDataSize + 2 = index 10)
+            if (request == null || request.Length < unknownDataSize + 3)
+            {
+                return new byte[0];
+            }
+
             byte version1 = request[unknownDataSize + 2];
             byte version2 = request[unknownDataSize + 0];
 
