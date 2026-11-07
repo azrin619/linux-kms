@@ -24,9 +24,12 @@ Custom C# KMS Server emulator modified for cross-platform Linux deployment, cont
 docker build -t kms-server .
 docker run -d --name kms-server --restart unless-stopped -p 1688:1688 kms-server
 
-#How to use and run
 
-## download the tar.gz or pull.
+
+
+##  **How to use and run**
+
+# download the tar.gz or pull.
 install XBUILD and other stuff in yr Linux
 xbuild /p:Configuration=Release KMSEmulator.NET/KMSEmulator.NET.csproj
 This will export the EXE FILE. I have removed ALOT of nonsense so it would build properly and run without any DLL issues.
@@ -48,8 +51,12 @@ sudo mono KMSEmulator.NET/bin/Release/KMSEmulator.NET.exe
             slmgr /skms kms.azrin.info:1688 if you are testing
       SLMGR /ato *(Activate it),it should see Product Activated
       SLMGR /dlv again to verify
+<img width="1085" height="812" alt="image" src="https://github.com/user-attachments/assets/148a326f-08f6-4a76-b718-ed469ca6b579" />
+
 
 On Server side, it should show :
+<img width="822" height="527" alt="image" src="https://github.com/user-attachments/assets/562dbf74-ea26-4c03-bc24-52e6e43901ce" />
+
 KMS Activation Request (KMS V6.0) Received:
 KMS PID: 03612-00206-491-710219-03-18441-14393.0000-1062023
 Application ID: 55c92734-d682-4d71-983e-d6ec3f16059f
