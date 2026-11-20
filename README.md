@@ -68,9 +68,14 @@ KMS Activation Response (KMS V6.0) sent.
 Good luck
 
 
+20Nov2026 update
+added a tcp callback block to prevent ddos or nmap from crashing.
+usage;
+open terminal and login to SUDO
+go to ~/KmsServer and then build
+after that **sudo mono KMSEmulator.NET/bin/Release/KMSEmulator.NET.exe**
 
-
-
+I will rework the daemon ..somehow it auto closes as a service.
 
 
 
