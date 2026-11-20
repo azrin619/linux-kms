@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using KMSEmulator.Logging;
@@ -56,7 +57,7 @@ namespace KMSEmulator
                 _tcpListenerIpv6.Start();
                 _tcpListenerIpv6.BeginAcceptTcpClient(AcceptTcpClientCallback, _tcpListenerIpv6);
             }
-            catch (SocketException) // If anything else is wrong with IPv6, don't fail but try IPv6
+            catch (SocketException) // If anything else is wrong with IPv6, don't fail but try IPv4
             {
                 ipv6Failure = true;
                 _tcpListenerIpv6 = null;
@@ -97,7 +98,11 @@ namespace KMSEmulator
             {
                 foreach (Client client in _clients)
                 {
-                    client.TcpClient.Client.Disconnect(false);
+                    try
+                    {
+                        client.TcpClient.Client.Disconnect(false);
+                    }
+                    catch { }
                 }
                 _clients.Clear();
             }
@@ -106,15 +111,13 @@ namespace KMSEmulator
             Running = false;
         }
 
-
         /// <summary>
-        /// Callback for the accept tcp client opertaion.
+        /// Callback for the accept tcp client operation.
         /// </summary>
         /// <param name="result">The async result object</param>
         private void AcceptTcpClientCallback(IAsyncResult result)
         {
             TcpListener tcpListener = result.AsyncState as TcpListener;
-            // Create Buffer for Client Message
             try
             {
                 if (tcpListener != null)
@@ -141,7 +144,22 @@ namespace KMSEmulator
                 // Log Client Listener Shutdown Error
                 _logger.LogMessage(string.Format("{0} client listener shut down", tcpListener != null && tcpListener.Equals(_tcpListenerIpv6) ? "IPv6" : "IPv4"));
             }
-
+            catch (SocketException)
+            {
+                // Ignore aborted connections during accept and keep listening
+                try
+                {
+                    if (tcpListener != null && Running)
+                    {
+                        tcpListener.BeginAcceptTcpClient(AcceptTcpClientCallback, tcpListener);
+                    }
+                }
+                catch { }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogMessage("Accept error: " + ex.Message);
+            }
         }
 
         /// <summary>
@@ -150,43 +168,73 @@ namespace KMSEmulator
         /// <param name="result">The async result object</param>
         private void ReadCallback(IAsyncResult result)
         {
-            // Get Client Handle
             Client client = result.AsyncState as Client;
             if (client == null) return;
 
-            // Read Client Request Message
-            NetworkStream networkStream = client.TcpClient.GetStream();
-
-            // Client Request Message Read Complete
-            if (networkStream.EndRead(result) == 0)
+            try
             {
-                lock (_clients)
+                // Read Client Request Message
+                NetworkStream networkStream = client.TcpClient.GetStream();
+
+                // Client Request Message Read Complete
+                if (networkStream.EndRead(result) == 0)
                 {
-                    // Remove Client
-                    _clients.Remove(client);
                     return;
                 }
+
+                // Send Server Response Message (RPC Bind)
+                byte[] response = _messageHandler.HandleRequest(client.Buffer);
+                if (response != null && response.Length > 0)
+                {
+                    client.TcpClient.Client.Send(response);
+                }
+
+                // Read and Respond to Second Message (KMS Activation Request)
+                byte[] request2 = GetRequestArray(client);
+                if (request2 != null && request2.Length > 0)
+                {
+                    byte[] response2 = _messageHandler.HandleRequest(request2);
+                    if (response2 != null && response2.Length > 0)
+                    {
+                        client.TcpClient.Client.Send(response2);
+                    }
+                }
+
+                // Close Client Connection
+                client.TcpClient.Client.Shutdown(SocketShutdown.Receive);
             }
-
-            // Log Accepted Client Connection
-            //_logger.LogMessage("Connection accepted from " + client.TcpClient.Client.RemoteEndPoint);
-
-            // Send Server Response Message
-            byte[] response = _messageHandler.HandleRequest(client.Buffer);
-            client.TcpClient.Client.Send(response);
-            byte[] request2 = GetRequestArray(client);
-            byte[] response2 = _messageHandler.HandleRequest(request2);
-            client.TcpClient.Client.Send(response2);
-
-            // Close Client Connection and Log Closed Connection
-            client.TcpClient.Client.Shutdown(SocketShutdown.Receive);
-            client.TcpClient.Client.Close();
-            //_logger.LogMessage("Connection closed");
-
-            // Remove Client from Client List
-            lock (_clients)
+            catch (SocketException)
             {
-                _clients.Remove(client);
+                // Safely ignore abrupt client disconnects / TCP resets (e.g., port scanners)
+            }
+            catch (IOException)
+            {
+                // Safely ignore network stream read/write interruptions
+            }
+            catch (ObjectDisposedException)
+            {
+                // Safely ignore already disposed sockets
+            }
+            catch (Exception ex)
+            {
+                _logger.LogMessage("Client handling error: " + ex.Message);
+            }
+            finally
+            {
+                // Always clean up socket and remove client from active list
+                try
+                {
+                    if (client.TcpClient != null)
+                    {
+                        client.TcpClient.Close();
+                    }
+                }
+                catch { }
+
+                lock (_clients)
+                {
+                    _clients.Remove(client);
+                }
             }
         }
 
@@ -201,8 +249,14 @@ namespace KMSEmulator
             byte[] requestBuffer = new byte[1024];
             int requestSize = client.TcpClient.Client.Receive(requestBuffer);
 
-            // Assign Buffer to Client Object
-            Array.Copy(requestBuffer, client.Buffer, requestSize);
+            if (requestSize <= 0)
+            {
+                return new byte[0];
+            }
+
+            // Clear old buffer data before copying new request
+            Array.Clear(client.Buffer, 0, client.Buffer.Length);
+            Array.Copy(requestBuffer, client.Buffer, Math.Min(requestSize, client.Buffer.Length));
             return client.Buffer;
         }
 
